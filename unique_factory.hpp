@@ -38,7 +38,7 @@ using std::shared_ptr;
 using std::tuple;
 using std::weak_ptr;
 
-namespace exactreal {
+namespace {
 template <typename T>
 struct is_shared_ptr : std::false_type {
   using weak = T;
@@ -62,54 +62,57 @@ template <typename T>
 struct is_unique_ptr<std::unique_ptr<T>> : std::true_type {};
 
 // A thread-safe factory that creates unique cached objects. This is
-// essentially a reimplementation of SageMath's UniqueFactory. The keys and
-// values are stored with weak_ptr so this factory does neither keep keys nor
-// values alive.
-//
-// We are not really using the weakness of the keys yet. For it to really make
-// sense, we would have to turn things such as vector<shared_ptr> into
-// vector<weak_ptr> …. But maybe we don't actually need that part and could
-// simplify this quite a bit.
+// essentially a reimplementation of SageMath's UniqueFactory. The values are
+// stored with a weak_ptr so they are not kept alive by the factory. However,
+// the keys are stored without a weak_ptr so the factory does keep the keys
+// alive until the values disappear.
+
 template <typename V, typename... K>
 class UniqueFactory {
   std::mutex mutex;
 
-  using WeakKey = tuple<typename is_shared_ptr<K>::weak...>;
-  using KeyValuePair = pair<WeakKey, weak_ptr<V>>;
+  using Key = tuple<K...>;
+  using Value = weak_ptr<V>;
+  using KeyValuePair = pair<Key, Value>;
   list<KeyValuePair> cache;
 
   template <typename T>
-  static bool isAlive(const T& ptr) {
-    if constexpr (is_weak_ptr<T>::value) {
-      return !ptr.expired;
-    } else {
-      return true;
-    }
+  static bool isAlive(const Value& value) {
+    return !value.expired();
   }
 
   template <typename T>
   static decltype(auto) target(T&& ptr) {
-    if constexpr (is_weak_ptr<T>::value) {
-      assert(!ptr.expired);
-      assert(ptr != nullptr);
-      return *ptr;
+    if constexpr (is_weak_ptr<std::decay_t<T>>::value) {
+      assert(!ptr.expired());
+      return ptr.lock();
     } else {
       return std::forward<T>(ptr);
     }
   }
 
-  bool isValidKey(const WeakKey& key) {
-    return std::apply([](auto&&... args) {
-      return (isAlive(args) && ...);
-    },
-                      key);
+  template<std::size_t I = 0, typename... Tp>
+  inline typename std::enable_if<I == sizeof...(Tp), bool>::type
+  eqKey(std::tuple<Tp...>&, std::tuple<Tp...>&) { return true; }
+
+  template<std::size_t I = 0, typename... Tp>
+  inline typename std::enable_if<I < sizeof...(Tp), bool>::type
+  eqKey(std::tuple<Tp...>& s, std::tuple<Tp...>& t)
+  {
+    return eqKeyEntry(std::get<I>(s), std::get<I>(t)) && eqKey<I + 1, Tp...>(s, t);
   }
 
-  bool eq(const WeakKey& a, const WeakKey& b) {
-    // The use of tuple here is probably not a good idea as it has to invoke
-    // copy constructors on everything which might be expensive.
-    return std::apply([](auto&&... args) { return tuple(target(std::forward<decltype(args)>(args))...); }, a) ==
-           std::apply([](auto&&... args) { return tuple(target(std::forward<decltype(args)>(args))...); }, b);
+  template <typename T>
+  static bool eqKeyEntry(T&& s, T&& t) {
+    if constexpr (is_shared_ptr<std::decay_t<T>>::value || is_unique_ptr<std::decay_t<T>>::value) {
+      return (s == nullptr && t == nullptr) || *s == *t;
+    } else if (is_weak_ptr<std::decay_t<T>>::value) {
+      assert(!s.expired());
+      assert(!t.expired());
+      return s.lock() == t.lock();
+    } else {
+      return s == t;
+    }
   }
 
  public:
@@ -123,34 +126,33 @@ class UniqueFactory {
   UniqueFactory& operator=(const UniqueFactory&) = delete;
   UniqueFactory& operator=(UniqueFactory&&) = delete;
 
-  shared_ptr<V> get(const K&... k, function<V*(const K&... k)> create) {
+  shared_ptr<V> get(const K&... k, function<V*()> create) {
     std::lock_guard<std::mutex> lock(mutex);
 
-    WeakKey key{k...};
-    assert(isValidKey(key) && "Parts of the key were garbage collected while creating its entry in the cache which shouldn't be easily possible in C++.");
+    Key key{k...};
 
     auto it = cache.begin();
     while (it != cache.end()) {
-      if (!isValidKey(it->first) || it->second.expired()) {
+      if (it->second.expired()) {
         auto jt = it;
         it++;
         cache.erase(jt);
         continue;
       }
 
-      if (eq(it->first, key)) {
+      if (eqKey(it->first, key)) {
         return static_cast<shared_ptr<V>>(it->second);
       }
 
       ++it;
     }
 
-    shared_ptr<V> ret(create(k...));
+    shared_ptr<V> ret(create());
     cache.emplace_front(KeyValuePair(key, weak_ptr<V>(ret)));
     return ret;
   }
 };
 
-}  // namespace exactreal
+}
 
 #endif
