@@ -106,7 +106,7 @@ class UniqueFactory {
   static bool eqKeyEntry(T&& s, T&& t) {
     if constexpr (is_shared_ptr<std::decay_t<T>>::value || is_unique_ptr<std::decay_t<T>>::value) {
       return (s == nullptr && t == nullptr) || *s == *t;
-    } else if (is_weak_ptr<std::decay_t<T>>::value) {
+    } else if constexpr (is_weak_ptr<std::decay_t<T>>::value) {
       assert(!s.expired());
       assert(!t.expired());
       return s.lock() == t.lock();
@@ -141,7 +141,7 @@ class UniqueFactory {
       }
 
       if (eqKey(it->first, key)) {
-        return static_cast<shared_ptr<V>>(it->second);
+        return it->second.lock();
       }
 
       ++it;
