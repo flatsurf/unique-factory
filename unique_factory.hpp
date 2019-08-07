@@ -118,7 +118,9 @@ class UniqueFactory {
  public:
   UniqueFactory() {
     static_assert(!is_weak_ptr<V>::value && !is_shared_ptr<V>::value && !is_unique_ptr<V>::value && !std::is_pointer<V>::value, "V must be a non-pointer type");
-    static_assert(std::conjunction_v<std::negation<is_weak_ptr<K>>...>, "K must be not contain weak pointers");
+    // TODO: I believe there is no hard reason why the key should not contain weak pointers. The soft reasons are probably:
+    // * these cannot be put into map<K,…>
+    // static_assert(std::conjunction_v<std::negation<is_weak_ptr<K>>...>, "K must be not contain weak pointers");
   }
 
   UniqueFactory(const UniqueFactory&) = delete;
