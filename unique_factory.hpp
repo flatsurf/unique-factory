@@ -126,7 +126,19 @@ class UniqueFactory {
   UniqueFactory& operator=(const UniqueFactory&) = delete;
   UniqueFactory& operator=(UniqueFactory&&) = delete;
 
-  shared_ptr<V> get(const K&... k, function<V*()> create) {
+  shared_ptr<const V> get(const K&... k, function<V()> create) {
+    return get(k..., [&]() {
+      return shared_ptr<V>(create());
+    });
+  }
+
+  shared_ptr<const V> get(const K&... k, function<V*()> create) {
+    return get(k..., [&]() {
+      return shared_ptr<V>(create());
+    });
+  }
+
+  shared_ptr<const V> get(const K&... k, function<std::shared_ptr<V>()> create) {
     std::lock_guard<std::mutex> lock(mutex);
 
     Key key{k...};
@@ -147,7 +159,7 @@ class UniqueFactory {
       ++it;
     }
 
-    shared_ptr<V> ret(create());
+    shared_ptr<V> ret = create();
     cache.emplace_front(KeyValuePair(key, weak_ptr<V>(ret)));
     return ret;
   }
