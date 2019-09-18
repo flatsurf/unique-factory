@@ -72,7 +72,8 @@ class UniqueFactory {
   std::mutex mutex;
 
   using Key = tuple<K...>;
-  using Value = weak_ptr<V>;
+  static constexpr bool weakKeys = std::disjunction_v<is_weak_ptr<K>...>;
+  using Value = std::conditional_t<weakKeys, std::shared_ptr<V>, std::weak_ptr<V>>;
   using KeyValuePair = pair<Key, Value>;
   list<KeyValuePair> cache;
 
@@ -115,12 +116,23 @@ class UniqueFactory {
     }
   }
 
+  bool isExpired(const tuple<K...>& k) {
+    return isExpired(std::get<K>(k)...);
+  }
+
+  template <typename T>
+  bool isExpired(const T&) {
+    return false;
+  }
+
+  template <typename T>
+  bool isExpired(const std::weak_ptr<T>& ptr) {
+    return ptr.expired();
+  }
+
  public:
   UniqueFactory() {
     static_assert(!is_weak_ptr<V>::value && !is_shared_ptr<V>::value && !is_unique_ptr<V>::value && !std::is_pointer<V>::value, "V must be a non-pointer type");
-    // TODO: I believe there is no hard reason why the key should not contain weak pointers. The soft reasons are probably:
-    // * these cannot be put into map<K,…>
-    // static_assert(std::conjunction_v<std::negation<is_weak_ptr<K>>...>, "K must be not contain weak pointers");
   }
 
   UniqueFactory(const UniqueFactory&) = delete;
@@ -147,22 +159,33 @@ class UniqueFactory {
 
     auto it = cache.begin();
     while (it != cache.end()) {
-      if (it->second.expired()) {
-        auto jt = it;
-        it++;
-        cache.erase(jt);
-        continue;
-      }
-
-      if (eqKey(it->first, key)) {
-        return it->second.lock();
+      if constexpr(weakKeys) {
+        if (isExpired(it->first)) {
+          auto jt = it;
+          it++;
+          cache.erase(jt);
+          continue;
+        }
+        if (eqKey(it->first, key)) {
+          return it->second;
+        }
+      } else {
+        if (it->second.expired()) {
+          auto jt = it;
+          it++;
+          cache.erase(jt);
+          continue;
+        }
+        if (eqKey(it->first, key)) {
+          return it->second.lock();
+        }
       }
 
       ++it;
     }
 
     shared_ptr<V> ret = create();
-    cache.emplace_front(KeyValuePair(key, weak_ptr<V>(ret)));
+    cache.emplace_front(KeyValuePair(key, ret));
     return ret;
   }
 };
