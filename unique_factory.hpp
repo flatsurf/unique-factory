@@ -38,7 +38,8 @@ using std::shared_ptr;
 using std::tuple;
 using std::weak_ptr;
 
-namespace {
+namespace unique_factory {
+
 template <typename T>
 struct is_shared_ptr : std::false_type {
   using weak = T;
@@ -50,10 +51,20 @@ struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {
 };
 
 template <typename T>
-struct is_weak_ptr : std::false_type {};
+constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
 
 template <typename T>
-struct is_weak_ptr<std::weak_ptr<T>> : std::true_type {};
+struct is_weak_ptr : std::false_type {
+  using shared = T;
+};
+
+template <typename T>
+struct is_weak_ptr<std::weak_ptr<T>> : std::true_type {
+  using shared = std::shared_ptr<T>;
+};
+
+template <typename T>
+constexpr bool is_weak_ptr_v = is_weak_ptr<T>::value;
 
 template <typename T>
 struct is_unique_ptr : std::false_type {};
@@ -61,132 +72,105 @@ struct is_unique_ptr : std::false_type {};
 template <typename T>
 struct is_unique_ptr<std::unique_ptr<T>> : std::true_type {};
 
-// A thread-safe factory that creates unique cached objects. This is
-// essentially a reimplementation of SageMath's UniqueFactory. The values are
-// stored with a weak_ptr so they are not kept alive by the factory. However,
-// the keys are stored without a weak_ptr so the factory does keep the keys
-// alive until the values disappear.
+template <typename T>
+constexpr bool is_unique_ptr_v = is_unique_ptr<T>::value;
 
+// A thread-safe factory that creates unique cached objects. This
+// is essentially trying to reimplement SageMath's UniqueFactory
+// with C++ smart pointers.
 template <typename V, typename... K>
 class UniqueFactory {
   std::mutex mutex;
 
-  using Key = tuple<K...>;
-  static constexpr bool weakKeys = std::disjunction_v<is_weak_ptr<K>...>;
-  using Value = std::conditional_t<weakKeys, std::shared_ptr<V>, std::weak_ptr<V>>;
-  using KeyValuePair = pair<Key, Value>;
-  list<KeyValuePair> cache;
+  using InternalKey = tuple<K...>;
+  using InternalValue = V;
+  using ExposedValue = typename is_weak_ptr<V>::shared;
 
-  template <typename T>
-  static bool isAlive(const Value& value) {
-    return !value.expired();
+  using Storage = pair<InternalKey, InternalValue>;
+
+  list<Storage> cache;
+
+  static bool isAlive(const Storage& entry) {
+    return isAlive(entry.first) && isAlive(entry.second);
+  }
+
+  static bool isAlive(const InternalKey& key) {
+    return (isAlive(std::get<K>(key)) && ... );
   }
 
   template <typename T>
-  static decltype(auto) target(T&& ptr) {
-    if constexpr (is_weak_ptr<std::decay_t<T>>::value) {
-      assert(!ptr.expired());
-      return ptr.lock();
+  static bool isAlive(const T& value) {
+    if constexpr (is_weak_ptr_v<T>) {
+      return !value.expired();
     } else {
-      return std::forward<T>(ptr);
+      return true;
     }
   }
 
-  template<std::size_t I = 0, typename... Tp>
-  inline typename std::enable_if<I == sizeof...(Tp), bool>::type
-  eqKey(std::tuple<Tp...>&, std::tuple<Tp...>&) { return true; }
+  template <typename T>
+  static constexpr bool false_v = false;
 
-  template<std::size_t I = 0, typename... Tp>
-  inline typename std::enable_if<I < sizeof...(Tp), bool>::type
-  eqKey(std::tuple<Tp...>& s, std::tuple<Tp...>& t)
-  {
-    return eqKeyEntry(std::get<I>(s), std::get<I>(t)) && eqKey<I + 1, Tp...>(s, t);
+  static bool eq(const InternalKey& lhs, const InternalKey& rhs) {
+    return (eq(std::get<K>(lhs), std::get<K>(rhs)) && ...);
   }
 
   template <typename T>
-  static bool eqKeyEntry(T&& s, T&& t) {
-    if constexpr (is_shared_ptr<std::decay_t<T>>::value || is_unique_ptr<std::decay_t<T>>::value) {
-      return (s == nullptr && t == nullptr) || *s == *t;
-    } else if constexpr (is_weak_ptr<std::decay_t<T>>::value) {
-      assert(!s.expired());
-      assert(!t.expired());
-      return s.lock() == t.lock();
+  static bool eq(const T& lhs, const T& rhs) {
+    if constexpr (is_weak_ptr_v<T>) {
+      return !lhs.expired() && !rhs.expired() && lhs.lock() == rhs.lock();
     } else {
-      return s == t;
+      return lhs == rhs;
     }
-  }
-
-  bool isExpired(const tuple<K...>& k) {
-    return isExpired(std::get<K>(k)...);
-  }
-
-  template <typename T>
-  bool isExpired(const T&) {
-    return false;
-  }
-
-  template <typename T>
-  bool isExpired(const std::weak_ptr<T>& ptr) {
-    return ptr.expired();
   }
 
  public:
-  UniqueFactory() {
-    static_assert(!is_weak_ptr<V>::value && !is_shared_ptr<V>::value && !is_unique_ptr<V>::value && !std::is_pointer<V>::value, "V must be a non-pointer type");
-  }
-
+  UniqueFactory() = default;
   UniqueFactory(const UniqueFactory&) = delete;
   UniqueFactory(UniqueFactory&&) = delete;
   UniqueFactory& operator=(const UniqueFactory&) = delete;
   UniqueFactory& operator=(UniqueFactory&&) = delete;
 
-  shared_ptr<const V> get(const K&... k, function<V()> create) {
-    return get(k..., [&]() {
-      return shared_ptr<V>(create());
-    });
-  }
-
-  shared_ptr<const V> get(const K&... k, function<V*()> create) {
-    return get(k..., [&]() {
-      return shared_ptr<V>(create());
-    });
-  }
-
-  shared_ptr<const V> get(const K&... k, function<std::shared_ptr<V>()> create) {
+  ExposedValue get(const K&... k, function<ExposedValue()> create) {
     std::lock_guard<std::mutex> lock(mutex);
 
-    Key key{k...};
+    InternalKey key{k...};
 
     auto it = cache.begin();
     while (it != cache.end()) {
-      if constexpr(weakKeys) {
-        if (isExpired(it->first)) {
-          auto jt = it;
-          it++;
-          cache.erase(jt);
-          continue;
-        }
-        if (eqKey(it->first, key)) {
-          return it->second;
-        }
-      } else {
-        if (it->second.expired()) {
-          auto jt = it;
-          it++;
-          cache.erase(jt);
-          continue;
-        }
-        if (eqKey(it->first, key)) {
+      if (!isAlive(*it)) {
+        auto jt = it;
+        it++;
+        cache.erase(jt);
+        continue;
+      }
+      if (eq(it->first, key)) {
+        if constexpr (is_weak_ptr<InternalValue>::value) {
           return it->second.lock();
+        } else {
+          return it->second;
         }
       }
 
       ++it;
     }
 
-    shared_ptr<V> ret = create();
-    cache.emplace_front(KeyValuePair(key, ret));
+    auto ret = create();
+    cache.emplace_front(Storage(key, ret));
     return ret;
+  }
+
+  template <typename T = ExposedValue> 
+  T get(const K&... k, function<typename T::element_type*()> create) {
+    return get(k..., [&]() {
+      return std::shared_ptr<typename T::element_type>(create());
+    });
+  }
+
+  template <typename T = ExposedValue> 
+  T get(const K&... k, function<typename T::element_type()> create) {
+    return get(k..., [&]() {
+      return std::make_shared<typename T::element_type>(create());
+    });
   }
 };
 
