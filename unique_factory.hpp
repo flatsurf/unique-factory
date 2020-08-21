@@ -83,12 +83,13 @@ class UniqueFactory {
 
   template <typename T>
   static decltype(auto) target(T&& ptr) {
-    if constexpr (is_weak_ptr<std::decay_t<T>>::value) {
-      assert(!ptr.expired());
-      return ptr.lock();
-    } else {
-      return std::forward<T>(ptr);
-    }
+    return std::forward<T>(ptr);
+  }
+
+  template <typename T>
+  static decltype(auto) target(std::weak_ptr<T>&& ptr) {
+    assert(!ptr.expired());
+    return ptr.lock();
   }
 
   template<std::size_t I = 0, typename... Tp>
@@ -104,21 +105,32 @@ class UniqueFactory {
 
   template <typename T>
   static bool eqKeyEntry(T&& s, T&& t) {
-    if constexpr (is_shared_ptr<std::decay_t<T>>::value || is_unique_ptr<std::decay_t<T>>::value) {
-      return (s == nullptr && t == nullptr) || *s == *t;
-    } else if (is_weak_ptr<std::decay_t<T>>::value) {
-      assert(!s.expired());
-      assert(!t.expired());
-      return s.lock() == t.lock();
-    } else {
-      return s == t;
-    }
+    return s == t;
+  }
+
+  template <typename T>
+  static bool eqKeyEntry(std::unique_ptr<T>&& s, std::unique_ptr<T>&& t) {
+    return (s == nullptr && t == nullptr) || *s == *t;
+  }
+
+  template <typename T>
+  static bool eqKeyEntry(std::shared_ptr<T>&& s, std::shared_ptr<T>&& t) {
+    return (s == nullptr && t == nullptr) || *s == *t;
+  }
+
+  template <typename T>
+  static bool eqKeyEntry(std::weak_ptr<T>&& s, std::weak_ptr<T>&& t) {
+    assert(!s.expired());
+    assert(!t.expired());
+    return s.lock() == t.lock();
   }
 
  public:
   UniqueFactory() {
     static_assert(!is_weak_ptr<V>::value && !is_shared_ptr<V>::value && !is_unique_ptr<V>::value && !std::is_pointer<V>::value, "V must be a non-pointer type");
+#if  __cplusplus >= 201703L
     static_assert(std::conjunction_v<std::negation<is_weak_ptr<K>>...>, "K must be not contain weak pointers");
+#endif
   }
 
   UniqueFactory(const UniqueFactory&) = delete;
