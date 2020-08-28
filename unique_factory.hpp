@@ -125,7 +125,7 @@ class UniqueFactory {
   }
 
   template<std::size_t I = 0, typename... T>
-  std::enable_if_t<I == sizeof...(T), bool> isAlive(const std::tuple<T...>& lhs, const std::tuple<T...>& rhs) {
+  std::enable_if_t<I == sizeof...(T), bool> isAlive(const std::tuple<T...>&, const std::tuple<T...>&) {
     return true;
   }
 
