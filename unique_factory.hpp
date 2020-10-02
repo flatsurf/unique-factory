@@ -1,7 +1,7 @@
 /**********************************************************************
  *  This file is part of unique-factory.
  *
- *        Copyright (C) 2019 Julian Rüth
+ *        Copyright (C) 2020 Julian Rüth
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,172 +27,61 @@
 
 #include <cassert>
 #include <functional>
-#include <list>
 #include <memory>
 #include <mutex>
-
-using std::function;
-using std::list;
-using std::pair;
-using std::shared_ptr;
-using std::tuple;
-using std::weak_ptr;
+#include <unordered_map>
 
 namespace {
 
 namespace unique_factory {
 
-template <typename T>
-struct is_shared_ptr : std::false_type {
-  using weak = T;
-};
-
-template <typename T>
-struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {
-  using weak = std::weak_ptr<T>;
-};
-
-template <typename T>
-constexpr bool is_shared_ptr_v = is_shared_ptr<T>::value;
-
-template <typename T>
-struct is_weak_ptr : std::false_type {
-  using shared = T;
-};
-
-template <typename T>
-struct is_weak_ptr<std::weak_ptr<T>> : std::true_type {
-  using shared = std::shared_ptr<T>;
-};
-
-template <typename T>
-constexpr bool is_weak_ptr_v = is_weak_ptr<T>::value;
-
-template <typename T>
-struct is_unique_ptr : std::false_type {};
-
-template <typename T>
-struct is_unique_ptr<std::unique_ptr<T>> : std::true_type {};
-
-template <typename T>
-constexpr bool is_unique_ptr_v = is_unique_ptr<T>::value;
-
-// A thread-safe factory that creates unique cached objects. This
-// is essentially trying to reimplement SageMath's UniqueFactory
-// with C++ smart pointers.
-template <typename V, typename... K>
+template <typename Key, typename Value, typename Hash = std::hash<Key>, typename KeyEqual = std::equal_to<Key>>
 class UniqueFactory {
   std::mutex mutex;
 
-  using InternalKey = tuple<K...>;
-  using InternalValue = V;
-  using ExposedValue = typename is_weak_ptr<V>::shared;
+  std::unordered_map<Key, std::weak_ptr<Value>, Hash, KeyEqual> cache;
 
-  using Storage = pair<InternalKey, InternalValue>;
+  class Deleter {
+    UniqueFactory* factory;
+    Key key;
 
-  list<Storage> cache;
+   public:
+    Deleter(UniqueFactory* factory, const Key& key) :
+      factory(factory),
+      key(key) {}
 
-  static bool isAlive(const Storage& entry) {
-    return isAlive(entry.first) && isAlive(entry.second);
-  }
-
-  template<std::size_t I = 0, typename... T>
-  static std::enable_if_t<I == sizeof...(T), bool> isAlive(const std::tuple<T...>&) {
-    return true;
-  }
-
-  template<std::size_t I = 0, typename... T>
-  static std::enable_if_t<I < sizeof...(T), bool> isAlive(const std::tuple<T...>& key) {
-    return isAlive(std::get<I>(key)) && isAlive<I + 1, T...>(key);
-  }
-
-  template <typename T>
-  static bool isAlive(const T&) {
-    return true;
-  }
-
-  template <typename T>
-  static bool isAlive(const std::weak_ptr<T>& value) {
-    return !value.expired();
-  }
-
-  template <typename T>
-  static constexpr bool false_v = false;
-
-  template<std::size_t I = 0, typename... T>
-  std::enable_if_t<I < sizeof...(T), bool> isAlive(const std::tuple<T...>& lhs, const std::tuple<T...>& rhs) {
-    return eq(std::get<I>(lhs), std::get<I>(rhs)) && eq<I + 1, T...>(lhs, rhs);
-  }
-
-  template<std::size_t I = 0, typename... T>
-  std::enable_if_t<I == sizeof...(T), bool> isAlive(const std::tuple<T...>&, const std::tuple<T...>&) {
-    return true;
-  }
-
-  template <typename T>
-  static bool eq(const T& lhs, const T& rhs) {
-    return lhs == rhs;
-  }
-
-  template <typename T>
-  static bool eq(const std::weak_ptr<T>& lhs, const std::weak_ptr<T>& rhs) {
-    return !lhs.expired() && !rhs.expired() && lhs.lock() == rhs.lock();
-  }
-
-  template <typename T>
-  static ExposedValue get(const T& value) {
-    return value;
-  }
-
-  template <typename T>
-  static ExposedValue get(const std::weak_ptr<T>& value) {
-    return value.lock();
-  }
+    void operator()(Value* value) const {
+      factory->cache.erase(key);
+      delete value;
+    }
+  };
 
  public:
   UniqueFactory() = default;
   UniqueFactory(const UniqueFactory&) = delete;
   UniqueFactory(UniqueFactory&&) = delete;
+
+  ~UniqueFactory() {
+    assert(cache.size() == 0 && "UniqueFactory is leaking memory.");
+  }
+  
   UniqueFactory& operator=(const UniqueFactory&) = delete;
   UniqueFactory& operator=(UniqueFactory&&) = delete;
 
-  ExposedValue get(const K&... k, function<ExposedValue()> create) {
+  std::shared_ptr<Value> get(const Key& key, std::function<Value*()> create) {
     std::lock_guard<std::mutex> lock(mutex);
 
-    InternalKey key{k...};
+    std::shared_ptr<Value> ret;
 
-    auto it = cache.begin();
-    while (it != cache.end()) {
-      if (!isAlive(*it)) {
-        auto jt = it;
-        it++;
-        cache.erase(jt);
-        continue;
-      }
-      if (eq(it->first, key)) {
-        return get(it->second);
-      }
-
-      ++it;
+    auto cached = cache.find(key);
+    if (cached != cache.end()) {
+      ret = cached->second.lock();
+    } else {
+      ret = std::shared_ptr<Value>(create(), Deleter(this, key));
+      cache[key] = ret;
     }
 
-    auto ret = create();
-    cache.emplace_front(Storage(key, ret));
     return ret;
-  }
-
-  template <typename T = ExposedValue> 
-  T get(const K&... k, function<typename T::element_type*()> create) {
-    return get(k..., [&]() {
-      return std::shared_ptr<typename T::element_type>(create());
-    });
-  }
-
-  template <typename T = ExposedValue> 
-  T get(const K&... k, function<typename T::element_type()> create) {
-    return get(k..., [&]() {
-      return std::make_shared<typename T::element_type>(create());
-    });
   }
 };
 
