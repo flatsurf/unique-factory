@@ -25,7 +25,7 @@
 #ifndef LIBUNIQUEFACTORY_UNIQUE_FACTORY_HPP
 #define LIBUNIQUEFACTORY_UNIQUE_FACTORY_HPP
 
-#include <cassert>
+#include <iostream>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -62,7 +62,11 @@ class UniqueFactory {
   UniqueFactory(UniqueFactory&&) = delete;
 
   ~UniqueFactory() {
-    assert(cache.size() == 0 && "UniqueFactory is leaking memory.");
+#ifndef NDEBUG
+    if (cache.size() != 0) {
+      std::cerr << "A unique factory is leaking memory. " << cache.size() << " objects were created through a C++ unique factory but never released. These objects might be part of a legitimate cache that is (unfortunately) not explicitly released upon program termination as is common in garbage-collocting languages such as Python." << std::endl;
+    }
+#endif
   }
   
   UniqueFactory& operator=(const UniqueFactory&) = delete;
