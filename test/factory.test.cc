@@ -47,6 +47,18 @@ TEST_CASE("Factory", "[factory]"){
 
     REQUIRE(*factory.get(0, []() { return new int{1}; }) == 1);
   }
+
+  SECTION("Values can be Kept Alive") {
+    UniqueFactory<int, int, KeepSetAlive<int, 1>> factory;
+
+    factory.get(0, []() { return new int{0}; });
+
+    REQUIRE(*factory.get(0, []() { return new int{1}; }) == 0);
+
+    factory.get(1, []() { return new int{0}; });
+
+    REQUIRE(*factory.get(0, []() { return new int{1}; }) == 1);
+  }
 }
 
 }

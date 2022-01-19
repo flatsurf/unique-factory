@@ -30,14 +30,51 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace unique_factory {
 
 namespace {
 
-template <typename Key, typename Value, typename Hash = std::hash<Key>,
+/// Keeps up to `history` elements alive.
+/// This is the default behavior of `UniqueFactory`, i.e.,  elements created by
+/// `UniqueFactory` are destroyed as soon as all strong references to them have
+/// gone out of scope.
+class KeepNothingAlive {
+ public:
+  template <typename Value>
+  void insert(const std::shared_ptr<Value>&) {}
+
+  void clear() {}
+};
+
+/// Keeps up to `history` elements alive.
+/// This can be set as a template parameter of `UniqueFactory` so that repeated
+/// calls to `UniqueFactory.get()` do not need to recreate objects if they have
+/// gone out of scope in the meantime.
+/// This simply holds on to up to `history` many shared pointers to `Value`.
+/// This makes sure that weak pointers to these elements are kept alive.
+template <typename Value, size_t history>
+class KeepSetAlive {
+  std::unordered_set<std::shared_ptr<Value>> workingSet;
+
+ public:
+  void insert(const std::shared_ptr<Value>& value) {
+    if (workingSet.size() >= history)
+      clear();
+
+    workingSet.insert(value);
+  }
+
+  void clear() {
+    workingSet.clear();
+  }
+};
+
+/// A cache that maps `Key` to `std::shared_ptr<Value>`.
+template <typename Key, typename Value, typename KeepAlive = KeepNothingAlive, typename Hash = std::hash<Key>,
           typename KeyEqual = std::equal_to<Key>>
-class UniqueFactory {
+class UniqueFactory : KeepAlive {
   std::mutex mutex;
 
   std::unordered_map<Key, std::weak_ptr<Value>, Hash, KeyEqual> cache;
@@ -63,6 +100,7 @@ public:
 
   ~UniqueFactory() {
 #ifndef NDEBUG
+    KeepAlive::clear();
     if (cache.size() != 0) {
       std::cerr << "A unique factory is leaking memory. " << cache.size()
                 << " objects were created through a C++ unique factory but "
@@ -78,6 +116,9 @@ public:
   UniqueFactory &operator=(const UniqueFactory &) = delete;
   UniqueFactory &operator=(UniqueFactory &&) = delete;
 
+  /// Return a shared pointer to the value with `key`.
+  /// If no such value can be found in the cache, one is created by invoking
+  /// `create()` first.
   std::shared_ptr<Value> get(const Key &key, std::function<Value *()> create) {
     std::lock_guard<std::mutex> lock(mutex);
 
@@ -90,6 +131,8 @@ public:
       ret = std::shared_ptr<Value>(create(), Deleter(this, key));
       cache[key] = ret;
     }
+
+    KeepAlive::insert(ret);
 
     return ret;
   }
