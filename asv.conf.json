@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "dvcs": "git",
+  "project": "unique-factory",
+  "project_url": "https://github.com/flatsurf/unique-factory",
+  "show_commit_url": "https://github.com/flatsurf/unique-factory/commit/",
+  "repo": ".",
+  "environment_type": "conda",
+  "matrix": {
+    "automake": [],
+    "benchmark==1.5.0": [],
+    "ccache": [],
+    "cppasv": [],
+    "cxx-compiler": [],
+    "libtool": [],
+    "make": []
+  },
+  "conda_channels": ["flatsurf", "conda-forge", "default"],
+  "build_command": [
+    "autoreconf -ivf",
+    "/bin/sh configure CXX='ccache c++' --without-doc",
+    "make"
+  ],
+  "install_command": [],
+  "uninstall_command": [],
+  "benchmark_dir": "tools/asv",
+  "env_dir": ".asv/env",
+  "results_dir": ".asv/results",
+  "html_dir": ".asv/html"
+}
+
+
