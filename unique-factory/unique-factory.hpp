@@ -64,7 +64,7 @@ class UniqueFactory {
   ~UniqueFactory() {
 #ifndef NDEBUG
     if (cache.size() != 0) {
-      std::cerr << "A unique factory is leaking memory. " << cache.size() << " objects were created through a C++ unique factory but never released. These objects might be part of a legitimate cache that is (unfortunately) not explicitly released upon program termination as is common in garbage-collocting languages such as Python." << std::endl;
+      std::cerr << "A unique factory is leaking memory. " << cache.size() << " objects were created through a C++ unique factory but never released. These objects might be part of a legitimate cache that is (unfortunately) not explicitly released upon program termination as is common in garbage-collecting languages such as Python." << std::endl;
     }
 #endif
   }

@@ -22,15 +22,22 @@
  * DEALINGS IN THE SOFTWARE.
  *********************************************************************/
 
-#include "external/catch2/single_include/catch2/catch.hpp"
+#include <benchmark/benchmark.h>
 
 #include "../unique-factory/unique-factory.hpp"
 
-namespace unique_factory {
-namespace test {
+using benchmark::DoNotOptimize;
+using benchmark::State;
 
-TEST_CASE("Factory", "[factory]"){
+namespace unique_factory {
+namespace benchmark {
+
+static void Nothing(State& state) {
+  for (auto _ : state) {
+    DoNotOptimize(0 + 0);
+  }
 }
+BENCHMARK(Nothing);
 
 }
 }

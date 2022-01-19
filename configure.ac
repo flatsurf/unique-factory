@@ -6,7 +6,7 @@ AC_INIT([unique-factory], [0.0.1], [julian.rueth@fsfe.org])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([.])
-AM_INIT_AUTOMAKE([1.14.1 subdir-objects])
+AM_INIT_AUTOMAKE([1.14.1 subdir-objects foreign])
 
 AC_CANONICAL_HOST
 
@@ -28,8 +28,16 @@ AX_VALGRIND_CHECK()
 dnl Check for required libraries
 AC_LANG([C++])
 
-dnl Our test suite uses googletest and Google's C++ benchmark library.
-dnl We fail if they cannot be found but let the user disable all checks explicitly.
-AC_CONFIG_FILES([Makefile test/Makefile])
+dnl Our benchmarks use Google's C++ benchmark library.
+dnl We fail if they cannot be found but let the user disable it explicitly.
+AC_ARG_WITH([benchmark], AS_HELP_STRING([--without-benchmark], [Do not build C++ benchmarks that require google/benchmark]))
+AS_IF([test "x$with_benchmark" != "xno"],
+      [
+       with_benchmark=yes
+       AC_CHECK_HEADERS([benchmark/benchmark.h], , AC_MSG_ERROR([benchmark headers not found; run --without-benchmark to disable building of benchmark/]))
+      ], [])
+AM_CONDITIONAL([HAVE_BENCHMARK], [test "x$with_benchmark" = "xyes"])
+
+AC_CONFIG_FILES([Makefile test/Makefile benchmark/Makefile])
 
 AC_OUTPUT
