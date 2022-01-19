@@ -4,3 +4,19 @@ unique-factory Change Log
 
 .. current developments
 
+v0.1.0
+====================
+
+**Added:**
+
+* Added release setup with rever.
+
+* Added template argument to `UniqueFactory` to keep weak pointers alive even
+  if all shared pointers to them have gone out of scope.
+
+**Changed:**
+
+* Moved header file to `unique-factory/unique-factory.hpp`.
+
+
+
