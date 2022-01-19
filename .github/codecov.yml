@@ -1,5 +1,5 @@
 ignore:
   - "usr"
-  - "**/*.test.cc"
-  - "**/*.benchmark.cc"
+  - "test"
+  - "benchmark"
   - "external"
