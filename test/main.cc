@@ -1,7 +1,7 @@
 /**********************************************************************
  *  This file is part of unique-factory.
  *
- *        Copyright (C) 2019 Julian Rüth
+ *        Copyright (C) 2022 Julian Rüth
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,15 +22,7 @@
  * DEALINGS IN THE SOFTWARE.
  *********************************************************************/
 
+// Shared entry point of all test binaries
+
+#define CATCH_CONFIG_MAIN
 #include "external/catch2/single_include/catch2/catch.hpp"
-
-#include "../unique_factory.hpp"
-
-namespace unique_factory {
-namespace test {
-
-TEST_CASE("Factory", "[factory]"){
-}
-
-}
-}

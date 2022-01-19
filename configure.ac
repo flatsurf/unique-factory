@@ -28,8 +28,6 @@ AX_VALGRIND_CHECK()
 dnl Check for required libraries
 AC_LANG([C++])
 
-dnl Our test suite uses googletest and Google's C++ benchmark library.
-dnl We fail if they cannot be found but let the user disable all checks explicitly.
 AC_CONFIG_FILES([Makefile test/Makefile])
 
 AC_OUTPUT
