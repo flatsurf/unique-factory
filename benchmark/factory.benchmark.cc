@@ -24,7 +24,7 @@
 
 #include <benchmark/benchmark.h>
 
-#include "../unique_factory.hpp"
+#include "../unique-factory/unique-factory.hpp"
 
 using benchmark::DoNotOptimize;
 using benchmark::State;

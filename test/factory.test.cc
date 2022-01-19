@@ -24,7 +24,7 @@
 
 #include "external/catch2/single_include/catch2/catch.hpp"
 
-#include "../unique_factory.hpp"
+#include "../unique-factory/unique-factory.hpp"
 
 namespace unique_factory {
 namespace test {
