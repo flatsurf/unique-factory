@@ -9,10 +9,10 @@
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
  * and/or sell copies of the Software, and to permit persons to whom the
  * Software is furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -25,8 +25,8 @@
 #ifndef LIBUNIQUEFACTORY_UNIQUE_FACTORY_HPP
 #define LIBUNIQUEFACTORY_UNIQUE_FACTORY_HPP
 
-#include <iostream>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -35,44 +35,50 @@ namespace unique_factory {
 
 namespace {
 
-template <typename Key, typename Value, typename Hash = std::hash<Key>, typename KeyEqual = std::equal_to<Key>>
+template <typename Key, typename Value, typename Hash = std::hash<Key>,
+          typename KeyEqual = std::equal_to<Key>>
 class UniqueFactory {
   std::mutex mutex;
 
   std::unordered_map<Key, std::weak_ptr<Value>, Hash, KeyEqual> cache;
 
   class Deleter {
-    UniqueFactory* factory;
+    UniqueFactory *factory;
     Key key;
 
-   public:
-    Deleter(UniqueFactory* factory, const Key& key) :
-      factory(factory),
-      key(key) {}
+  public:
+    Deleter(UniqueFactory *factory, const Key &key)
+        : factory(factory), key(key) {}
 
-    void operator()(Value* value) const {
+    void operator()(Value *value) const {
       factory->cache.erase(key);
       delete value;
     }
   };
 
- public:
+public:
   UniqueFactory() = default;
-  UniqueFactory(const UniqueFactory&) = delete;
-  UniqueFactory(UniqueFactory&&) = delete;
+  UniqueFactory(const UniqueFactory &) = delete;
+  UniqueFactory(UniqueFactory &&) = delete;
 
   ~UniqueFactory() {
 #ifndef NDEBUG
     if (cache.size() != 0) {
-      std::cerr << "A unique factory is leaking memory. " << cache.size() << " objects were created through a C++ unique factory but never released. These objects might be part of a legitimate cache that is (unfortunately) not explicitly released upon program termination as is common in garbage-collecting languages such as Python." << std::endl;
+      std::cerr << "A unique factory is leaking memory. " << cache.size()
+                << " objects were created through a C++ unique factory but "
+                   "never released. These objects might be part of a "
+                   "legitimate cache that is (unfortunately) not explicitly "
+                   "released upon program termination as is common in "
+                   "garbage-collecting languages such as Python."
+                << std::endl;
     }
 #endif
   }
-  
-  UniqueFactory& operator=(const UniqueFactory&) = delete;
-  UniqueFactory& operator=(UniqueFactory&&) = delete;
 
-  std::shared_ptr<Value> get(const Key& key, std::function<Value*()> create) {
+  UniqueFactory &operator=(const UniqueFactory &) = delete;
+  UniqueFactory &operator=(UniqueFactory &&) = delete;
+
+  std::shared_ptr<Value> get(const Key &key, std::function<Value *()> create) {
     std::lock_guard<std::mutex> lock(mutex);
 
     std::shared_ptr<Value> ret;
@@ -89,8 +95,8 @@ class UniqueFactory {
   }
 };
 
-}
+} // namespace unique_factory
 
-}
+} // namespace
 
 #endif
