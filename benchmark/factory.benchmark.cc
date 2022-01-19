@@ -49,6 +49,16 @@ static void Create(State& state) {
     DoNotOptimize(factory.get(0, []() { return new int{0}; }));
   }
 }
+BENCHMARK(Create);
+
+static void CreateWithKeepAlive(State& state) {
+  UniqueFactory<int, int, KeepSetAlive<int, 16>> factory;
+
+  for (auto _ : state) {
+    DoNotOptimize(factory.get(0, []() { return new int{0}; }));
+  }
+}
+BENCHMARK(CreateWithKeepAlive);
 
 }
 }
