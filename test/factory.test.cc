@@ -30,6 +30,14 @@ namespace unique_factory {
 namespace test {
 
 TEST_CASE("Factory", "[factory]"){
+  SECTION("Values are Cached") {
+    UniqueFactory<int, int> factory;
+    const auto cached = factory.get(0, []() { return new int{0}; });
+
+    REQUIRE_NOTHROW(factory.get(0, []() -> int* { throw new std::logic_error("should be created from cache"); }));
+
+    REQUIRE(factory.get(0, []() { return new int{0}; }) == cached);
+  }
 }
 
 }
