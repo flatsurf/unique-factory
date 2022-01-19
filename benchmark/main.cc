@@ -22,15 +22,6 @@
  * DEALINGS IN THE SOFTWARE.
  *********************************************************************/
 
-#include "external/catch2/single_include/catch2/catch.hpp"
+#include <benchmark/benchmark.h>
 
-#include "../unique_factory.hpp"
-
-namespace unique_factory {
-namespace test {
-
-TEST_CASE("Factory", "[factory]"){
-}
-
-}
-}
+BENCHMARK_MAIN();

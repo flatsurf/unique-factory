@@ -103,3 +103,9 @@ bb.out.*
 # Test output
 *.trs
 *.log
+
+# Local compiler setup
+compile_flags.txt
+
+# Temporary files
+*~
