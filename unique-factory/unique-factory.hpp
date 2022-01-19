@@ -31,9 +31,9 @@
 #include <mutex>
 #include <unordered_map>
 
-namespace {
-
 namespace unique_factory {
+
+namespace {
 
 template <typename Key, typename Value, typename Hash = std::hash<Key>, typename KeyEqual = std::equal_to<Key>>
 class UniqueFactory {
