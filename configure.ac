@@ -6,7 +6,7 @@ AC_INIT([unique-factory], [0.0.1], [julian.rueth@fsfe.org])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_AUX_DIR([.])
-AM_INIT_AUTOMAKE([1.14.1 subdir-objects])
+AM_INIT_AUTOMAKE([1.14.1 subdir-objects foreign])
 
 AC_CANONICAL_HOST
 
