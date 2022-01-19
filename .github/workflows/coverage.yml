@@ -31,11 +31,10 @@ jobs:
         shell: bash -l {0}
         run: |
           pushd test
-          gcov -pbs ../unique_factory unique_factory.test.gcda
+          find -type f -name '*.gcda' -exec gcov -pbs ../unique-factory '{}' ';'
           popd
           curl -s https://codecov.io/bash | bash -s - -X gcov -R `pwd` .
-      - name: show logs
-        run: grep "" /dev/null `find -name '*.log'` || true
+      - uses: flatsurf/actions/show-logs@main
         if: ${{ always() }}
 
 env:
