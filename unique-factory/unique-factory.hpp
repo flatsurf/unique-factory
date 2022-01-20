@@ -111,9 +111,9 @@ public:
     KeepAlive::clear();
     if (cache.size() != 0) {
 #ifndef NDEBUG
-      std::cerr << "A unique factory is leaking memory. " << cache.size()
+      std::cerr << "A unique factory is probably leaking memory. " << cache.size()
                 << " objects were created through a C++ unique factory but "
-                   "never released. These objects might be part of a "
+                   "had not been released when the factory was released. These objects might be part of a "
                    "legitimate cache that is (unfortunately) not explicitly "
                    "released upon program termination as is common in "
                    "garbage-collecting languages such as Python."
