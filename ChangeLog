@@ -4,6 +4,15 @@ unique-factory Change Log
 
 .. current developments
 
+v0.1.1
+====================
+
+**Fixed:**
+
+* Fixed a segfault when a factory gets destroyed before all its elements.
+
+
+
 v0.1.0
 ====================
 
