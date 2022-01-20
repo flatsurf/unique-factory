@@ -88,9 +88,9 @@ class UniqueFactory : KeepAlive {
         : factory(factory), key(key) {}
 
     void operator()(Value *value) const {
-      if (factory != nullptr) {
+      if (factory != nullptr)
         factory->cache.erase(key);
-      }
+
       delete value;
     }
 
