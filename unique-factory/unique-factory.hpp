@@ -1,7 +1,7 @@
 /**********************************************************************
  *  This file is part of unique-factory.
  *
- *        Copyright (C) 2020 Julian Rüth
+ *        Copyright (C) 2020-2022 Julian Rüth
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -88,8 +88,17 @@ class UniqueFactory : KeepAlive {
         : factory(factory), key(key) {}
 
     void operator()(Value *value) const {
-      factory->cache.erase(key);
+      if (factory != nullptr) {
+        factory->cache.erase(key);
+      }
       delete value;
+    }
+
+    /// Caled when the factory that created this elemnt was destroyed before
+    /// all references to this element were destroyed.
+    /// When this element eventually gets destroyed it cannot update its factory anymore.
+    void orphan() {
+      factory = nullptr;
     }
   };
 
@@ -99,9 +108,9 @@ public:
   UniqueFactory(UniqueFactory &&) = delete;
 
   ~UniqueFactory() {
-#ifndef NDEBUG
     KeepAlive::clear();
     if (cache.size() != 0) {
+#ifndef NDEBUG
       std::cerr << "A unique factory is leaking memory. " << cache.size()
                 << " objects were created through a C++ unique factory but "
                    "never released. These objects might be part of a "
@@ -109,8 +118,10 @@ public:
                    "released upon program termination as is common in "
                    "garbage-collecting languages such as Python."
                 << std::endl;
-    }
 #endif
+      for (const auto& leaked : cache)
+        std::get_deleter<Deleter>(leaked.second.lock())->orphan();
+    }
   }
 
   UniqueFactory &operator=(const UniqueFactory &) = delete;

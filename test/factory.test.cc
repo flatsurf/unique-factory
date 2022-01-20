@@ -59,6 +59,16 @@ TEST_CASE("Factory", "[factory]"){
 
     REQUIRE(*factory.get(0, []() { return new int{1}; }) == 1);
   }
+
+  SECTION("Factory can be Destroyed before the Values") {
+    std::shared_ptr<int> value;
+
+    {
+      UniqueFactory<int, int> factory;
+
+      value = factory.get(0, []() { return new int{0}; });
+    }
+  }
 }
 
 }
