@@ -150,11 +150,11 @@ public:
   /// If no such value can be found in the cache, one is created by invoking
   /// `create()` first.
   std::shared_ptr<const Value> get(const Key &key, const std::function<Value *(const Key&)>& create) {
-    return get_(key, create);
+    return getOrInsert(key, create);
   }
 
   std::shared_ptr<const Value> get(Key&& key, const std::function<Value *(const Key&)>& create) {
-    return get_(std::move(key), create);
+    return getOrInsert(std::move(key), create);
   }
 
   std::shared_ptr<const Value> get(Key&& key, const std::function<Value *()>& create) {
