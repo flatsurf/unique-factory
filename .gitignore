@@ -109,3 +109,7 @@ compile_flags.txt
 
 # Temporary files
 *~
+
+# Deployment
+/rever
+/unique-factory-*.tar.gz

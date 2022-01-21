@@ -28,6 +28,9 @@ AX_VALGRIND_CHECK()
 dnl Check for required libraries
 AC_LANG([C++])
 
+dnl We use some C++17 features, such as try_emplace.
+AX_CXX_COMPILE_STDCXX(17)
+
 dnl Our benchmarks use Google's C++ benchmark library.
 dnl We fail if they cannot be found but let the user disable it explicitly.
 AC_ARG_WITH([benchmark], AS_HELP_STRING([--without-benchmark], [Do not build C++ benchmarks that require google/benchmark]))

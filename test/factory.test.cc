@@ -29,44 +29,50 @@
 namespace unique_factory {
 namespace test {
 
+struct UniqueInt : public std::enable_shared_from_this<UniqueInt> {
+  UniqueInt(int value): value(value) {}
+
+  int value;
+};
+
 TEST_CASE("Factory", "[factory]"){
   SECTION("Values are Cached") {
-    UniqueFactory<int, int> factory;
-    const auto cached = factory.get(0, []() { return new int{0}; });
+    UniqueFactory<int, UniqueInt> factory;
+    const auto cached = factory.get(0, []() { return new UniqueInt{0}; });
 
-    REQUIRE(*factory.get(0, []() { return new int{1}; }) == 0);
+    REQUIRE(factory.get(0, []() { return new UniqueInt{1}; })->value == 0);
 
-    REQUIRE_NOTHROW(factory.get(0, []() -> int* { throw new std::logic_error("should be created from cache"); }));
+    REQUIRE_NOTHROW(factory.get(0, []() -> UniqueInt* { throw new std::logic_error("should be created from cache"); }));
 
-    REQUIRE(factory.get(0, []() { return new int{0}; }) == cached);
+    REQUIRE(factory.get(0, []() { return new UniqueInt{0}; }) == cached);
   }
 
   SECTION("Values are not Kept Alive") {
-    UniqueFactory<int, int> factory;
-    factory.get(0, []() { return new int{0}; });
+    UniqueFactory<int, UniqueInt> factory;
+    factory.get(0, []() { return new UniqueInt{0}; });
 
-    REQUIRE(*factory.get(0, []() { return new int{1}; }) == 1);
+    REQUIRE(factory.get(0, []() { return new UniqueInt{1}; })->value == 1);
   }
 
   SECTION("Values can be Kept Alive") {
-    UniqueFactory<int, int, KeepSetAlive<int, 1>> factory;
+    UniqueFactory<int, UniqueInt, KeepSetAlive<UniqueInt, 1>> factory;
 
-    factory.get(0, []() { return new int{0}; });
+    factory.get(0, []() { return new UniqueInt{0}; });
 
-    REQUIRE(*factory.get(0, []() { return new int{1}; }) == 0);
+    REQUIRE(factory.get(0, []() { return new UniqueInt{1}; })->value == 0);
 
-    factory.get(1, []() { return new int{0}; });
+    factory.get(1, []() { return new UniqueInt{0}; });
 
-    REQUIRE(*factory.get(0, []() { return new int{1}; }) == 1);
+    REQUIRE(factory.get(0, []() { return new UniqueInt{1}; })->value == 1);
   }
 
   SECTION("Factory can be Destroyed before the Values") {
-    std::shared_ptr<int> value;
+    std::shared_ptr<const UniqueInt> value;
 
     {
-      UniqueFactory<int, int> factory;
+      UniqueFactory<int, UniqueInt> factory;
 
-      value = factory.get(0, []() { return new int{0}; });
+      value = factory.get(0, []() { return new UniqueInt{0}; });
     }
   }
 }

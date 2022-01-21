@@ -43,7 +43,7 @@ namespace {
 class KeepNothingAlive {
  public:
   template <typename Value>
-  void insert(const std::shared_ptr<Value>&) {}
+  void insert(const std::shared_ptr<const Value>&) {}
 
   void clear() {}
 };
@@ -56,10 +56,10 @@ class KeepNothingAlive {
 /// This makes sure that weak pointers to these elements are kept alive.
 template <typename Value, size_t history>
 class KeepSetAlive {
-  std::unordered_set<std::shared_ptr<Value>> workingSet;
+  std::unordered_set<std::shared_ptr<const Value>> workingSet;
 
  public:
-  void insert(const std::shared_ptr<Value>& value) {
+  void insert(const std::shared_ptr<const Value>& value) {
     if (workingSet.size() >= history)
       clear();
 
@@ -77,7 +77,7 @@ template <typename Key, typename Value, typename KeepAlive = KeepNothingAlive, t
 class UniqueFactory : KeepAlive {
   std::mutex mutex;
 
-  std::unordered_map<Key, std::weak_ptr<Value>, Hash, KeyEqual> cache;
+  std::unordered_map<Key, const Value*, Hash, KeyEqual> cache;
 
   class Deleter {
     UniqueFactory *factory;
@@ -87,7 +87,7 @@ class UniqueFactory : KeepAlive {
     Deleter(UniqueFactory *factory, const Key &key)
         : factory(factory), key(key) {}
 
-    void operator()(Value *value) const {
+    void operator()(const Value *value) const {
       if (factory != nullptr)
         factory->cache.erase(key);
 
@@ -101,6 +101,25 @@ class UniqueFactory : KeepAlive {
       factory = nullptr;
     }
   };
+
+  template <typename K>
+  std::shared_ptr<const Value> getOrInsert(K&& key, const std::function<Value*(const Key&)>& create) {
+    std::lock_guard<std::mutex> lock(mutex);
+
+    std::shared_ptr<const Value> ret;
+
+    auto [it, inserted] = cache.try_emplace(std::forward<K>(key));
+    if (inserted) {
+      it->second = create(it->first);
+      ret = std::shared_ptr<const Value>(it->second, Deleter(this, it->first));
+    } else {
+      ret = it->second->shared_from_this();
+    }
+
+    KeepAlive::insert(ret);
+
+    return ret;
+  }
 
 public:
   UniqueFactory() = default;
@@ -120,7 +139,7 @@ public:
                 << std::endl;
 #endif
       for (const auto& leaked : cache)
-        std::get_deleter<Deleter>(leaked.second.lock())->orphan();
+        std::get_deleter<Deleter>(leaked.second->shared_from_this())->orphan();
     }
   }
 
@@ -130,22 +149,20 @@ public:
   /// Return a shared pointer to the value with `key`.
   /// If no such value can be found in the cache, one is created by invoking
   /// `create()` first.
-  std::shared_ptr<Value> get(const Key &key, std::function<Value *()> create) {
-    std::lock_guard<std::mutex> lock(mutex);
+  std::shared_ptr<const Value> get(const Key &key, const std::function<Value *(const Key&)>& create) {
+    return getOrInsert(key, create);
+  }
 
-    std::shared_ptr<Value> ret;
+  std::shared_ptr<const Value> get(Key&& key, const std::function<Value *(const Key&)>& create) {
+    return getOrInsert(std::move(key), create);
+  }
 
-    auto cached = cache.find(key);
-    if (cached != cache.end()) {
-      ret = cached->second.lock();
-    } else {
-      ret = std::shared_ptr<Value>(create(), Deleter(this, key));
-      cache[key] = ret;
-    }
+  std::shared_ptr<const Value> get(Key&& key, const std::function<Value *()>& create) {
+    return get(std::move(key), [&](const Key&) { return create(); });
+  }
 
-    KeepAlive::insert(ret);
-
-    return ret;
+  std::shared_ptr<const Value> get(const Key& key, const std::function<Value *()>& create) {
+    return get(key, [&](const Key&) { return create(); });
   }
 };
 
