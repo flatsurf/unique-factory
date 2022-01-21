@@ -4,6 +4,15 @@ unique-factory Change Log
 
 .. current developments
 
+v0.2.1
+====================
+
+**Fixed:**
+
+* Fixed cache inconsistency when factory function `create()` throws an exception.
+
+
+
 v0.2.0
 ====================
 
