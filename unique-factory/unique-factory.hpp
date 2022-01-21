@@ -110,7 +110,12 @@ class UniqueFactory : KeepAlive {
 
     auto [it, inserted] = cache.try_emplace(std::forward<K>(key));
     if (inserted) {
-      it->second = create(it->first);
+      try {
+        it->second = create(it->first);
+      } catch (...) {
+        cache.erase(it);
+        throw;
+      }
       ret = std::shared_ptr<const Value>(it->second, Deleter(this, it->first));
     } else {
       ret = it->second->shared_from_this();

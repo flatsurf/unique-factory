@@ -75,6 +75,14 @@ TEST_CASE("Factory", "[factory]"){
       value = factory.get(0, []() { return new UniqueInt{0}; });
     }
   }
+
+  SECTION("Factory can handle Failures") {
+    UniqueFactory<int, UniqueInt, KeepSetAlive<UniqueInt, 1>> factory;
+
+    REQUIRE_THROWS_AS(factory.get(0, []() -> UniqueInt* { throw std::logic_error("failure"); }), std::logic_error);
+
+    REQUIRE(factory.get(0, []() { return new UniqueInt{0}; })->value == 0);
+  }
 }
 
 }
