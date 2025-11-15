@@ -9,7 +9,7 @@ concurrency:
 
 jobs:
   test-unique-factory:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         target:
@@ -39,7 +39,7 @@ jobs:
       - uses: flatsurf/actions/show-logs@main
         if: ${{ always() }}
   distcheck:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v2
         with: { submodules: recursive }
