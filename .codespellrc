@@ -1,2 +1,2 @@
 [codespell]
-skip = test/external,pixi.lock
+skip = test/external/**/*,pixi.lock
