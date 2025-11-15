@@ -75,13 +75,14 @@ depends-on = "configure"
 # DEPENDENCIES #
 ################
 [dependencies]
+asv = ">=0.6.4,<0.7"
 automake = "*"
-make = "*"
-libtool = "*"
-coreutils = "*"
-c-compiler = "*"
-cxx-compiler = "*"
 benchmark = "*"
+c-compiler = "*"
+coreutils = "*"
+cxx-compiler = "*"
+libtool = "*"
+make = "*"
 
 [target.linux.dependencies]
 # A recent functioning valgrind is only available on conda-forge linux builds.
