@@ -94,7 +94,7 @@ class UniqueFactory : KeepAlive {
       delete value;
     }
 
-    /// Caled when the factory that created this elemnt was destroyed before
+    /// Caled when the factory that created this element was destroyed before
     /// all references to this element were destroyed.
     /// When this element eventually gets destroyed it cannot update its factory anymore.
     void orphan() {
