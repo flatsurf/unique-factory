@@ -85,6 +85,9 @@ cxx-compiler = "*"
 libtool = "*"
 make = "*"
 
+[pypi-dependencies]
+cppasv = { git = "https://github.com/flatsurf/cppasv.git" }
+
 [target.linux.dependencies]
 # A recent functioning valgrind is only available on conda-forge linux builds.
 valgrind = "*"
