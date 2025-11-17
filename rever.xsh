@@ -1,7 +1,7 @@
 #*********************************************************************
 #  This file is part of unique-factory.
 #
-#        Copyright (C) 2022 Julian Rüth
+#        Copyright (C) 2025 Julian Rüth
 #
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files (the "Software"),
@@ -22,28 +22,39 @@
 # DEALINGS IN THE SOFTWARE.
 #********************************************************************/
 
-# Check that we are on the master branch
-branch=$(git branch --show-current)
-if branch.strip() != "master":
-  raise Exception("You must be on the master branch to release.")
-# and that it is up to date with origin/master
-git fetch https://github.com/flatsurf/unique-factory.git
-git reset FETCH_HEAD
-git diff --exit-code
-git diff --cached --exit-code
+from rever.activity import activity
+from rever.activities.command import command
 
-import sys
 
-sys.path.insert(0, 'tools/rever')
+try:
+  input("Are you sure you are on the master branch which is identical to origin/master and the only pending changes are a version_info bump in configure.ac? [ENTER]")
+except KeyboardInterrupt:
+  sys.exit(1)
 
-import autodist
+command('pixi', 'pixi install --manifest-path "$PWD/pyproject.toml" -e dev')
+
+@activity
+def dist():
+    r"""
+    Run make dist and collect the resulting tarball.
+    """
+    from tempfile import TemporaryDirectory
+    from xonsh.dirstack import DIRSTACK
+    with TemporaryDirectory() as tmp:
+        ./bootstrap
+        pushd @(tmp)
+        @(DIRSTACK[-1])/configure
+        make dist
+        mv *.tar.gz @(DIRSTACK[-1])
+        popd
+    return True
 
 $PROJECT = 'unique-factory'
 
 $ACTIVITIES = [
     'version_bump',
     'changelog',
-    'autodist',
+    'dist',
     'tag',
     'push_tag',
     'ghrelease',
