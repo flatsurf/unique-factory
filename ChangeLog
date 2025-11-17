@@ -18,7 +18,7 @@ v0.2.0
 
 **Added:**
 
-* Added `get` overloads thats consume the `Key&&`.
+* Added `get` overloads that consume the `Key&&`.
 
 **Changed:**
 

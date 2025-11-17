@@ -1,0 +1,93 @@
+[project]
+channels = ["conda-forge"]
+description = "A header-only library to add UniqueFactory semantics to deduplicate parent structures"
+name = "unique-factory"
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+
+[environments]
+coverage = ["coverage"]
+
+[feature.coverage.activation.env]
+CFLAGS = "-coverage -O0 -UNDEBUG"
+CXXFLAGS = "-coverage -O0 -UNDEBUG"
+
+#########
+# TASKS #
+#########
+[tasks.bootstrap]
+cmd = "./bootstrap"
+inputs = ["configure.ac", "Makefile.am", "{benchmark,test}/**/Makefile.am"]
+outputs = ["configure", "{benchmark,test}/configure", "Makefile.in", "{benchmark,test}/**/*.in"]
+
+[tasks.configure]
+cmd = './configure --prefix="$CONDA_PREFIX"'
+depends-on = ["bootstrap"]
+inputs = ["configure", "benchmark/**/*.in", "test/**/*.in"]
+
+[tasks.build]
+cmd = "make check TESTS="
+depends-on = ["configure"]
+
+[tasks.test]
+cmd = "make check"
+depends-on = ["build"]
+
+[tasks.test-valgrind]
+cmd = "make check-valgrind"
+depends-on = ["build"]
+
+[tasks.codespell]
+cmd = "codespell $(git ls-files)"
+
+[tasks.distcheck]
+cmd = "make distcheck"
+depends-on = ["configure"]
+
+[tasks.compiler-warnings-clang]
+# The env hack is necessary to work around https://github.com/prefix-dev/pixi/issues/3287
+# We disable -Wdeprecated-declarations because we use our own deprecated API, e.g., for testing.
+cmd = """
+/usr/bin/env -u '?' sh -c '
+make clean &&
+make check TESTS= CPP=clang-cpp CC=clang CXX=clang++ CFLAGS=\"$CFLAGS -Werror -Wall -Wextra\" CXXFLAGS=\"$CXXFLAGS -Werror -Wall -Wextra -Wno-deprecated-declarations -UNDEBUG\" &&
+make clean &&
+make check TESTS= CPP=clang-cpp CC=clang CXX=clang++ CFLAGS=\"$CFLAGS -Werror -Wall -Wextra\" CXXFLAGS=\"$CXXFLAGS -Werror -Wall -Wextra -Wno-deprecated-declarations -fclang-abi-compat=17 -DNDEBUG\"
+'
+"""
+depends-on = "configure"
+
+[tasks.compiler-warnings-gcc]
+# The env hack is necessary to work around https://github.com/prefix-dev/pixi/issues/3287
+# We disable -Wsign-compare because .size() in C++ is well-known to be broken.
+# We disable -Wdeprecated-declarations because we use our own deprecated API, e.g., for testing.
+# We disable -Wdangling-reference because our tests rely on GENERATE_REF that does actually create a dangling reference.
+cmd = """
+/usr/bin/env -u '?' sh -c '
+make clean &&
+make check TESTS= CFLAGS=\"$CXFLAGS -Werror -Wall -Wextra" CXXFLAGS=\"$CXXFLAGS -Werror -Wall -Wextra -Wno-sign-compare -Wno-deprecated-declarations -Wno-dangling-reference -UNDEBUG\" &&
+make clean &&
+make check TESTS= CFLAGS=\"$CXFLAGS -Werror -Wall -Wextra" CXXFLAGS=\"$CXXFLAGS -Werror -Wall -Wextra -Wno-sign-compare -Wno-deprecated-declarations -Wno-dangling-reference -DNDEBUG\"
+'
+"""
+depends-on = "configure"
+
+################
+# DEPENDENCIES #
+################
+[dependencies]
+asv = ">=0.6.4,<0.7"
+automake = "*"
+benchmark = "*"
+c-compiler = "*"
+codespell = "*"
+coreutils = "*"
+cxx-compiler = "*"
+libtool = "*"
+make = "*"
+
+[pypi-dependencies]
+cppasv = { git = "https://github.com/flatsurf/cppasv.git" }
+
+[target.linux.dependencies]
+# A recent functioning valgrind is only available on conda-forge linux builds.
+valgrind = "*"

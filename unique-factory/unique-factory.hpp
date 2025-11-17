@@ -94,7 +94,7 @@ class UniqueFactory : KeepAlive {
       delete value;
     }
 
-    /// Caled when the factory that created this elemnt was destroyed before
+    /// Caled when the factory that created this element was destroyed before
     /// all references to this element were destroyed.
     /// When this element eventually gets destroyed it cannot update its factory anymore.
     void orphan() {
@@ -104,7 +104,11 @@ class UniqueFactory : KeepAlive {
 
   template <typename K>
   std::shared_ptr<const Value> getOrInsert(K&& key, const std::function<Value*(const Key&)>& create) {
-    std::lock_guard<std::mutex> lock(mutex);
+    // We do not use this lock_guard here since in cppyy (on macOS), we can get the following error:
+    // Warning: uncaught exception in JIT is rethrown; resources may leak
+    // When this happens, the lock_guard apparently "leaks" so it's never destructed and the mutex is locked forever.
+    // std::lock_guard<std::mutex> lock(mutex);
+    mutex.lock();
 
     std::shared_ptr<const Value> ret;
 
@@ -113,6 +117,7 @@ class UniqueFactory : KeepAlive {
       try {
         it->second = create(it->first);
       } catch (...) {
+        mutex.unlock();
         cache.erase(it);
         throw;
       }
@@ -123,6 +128,7 @@ class UniqueFactory : KeepAlive {
 
     KeepAlive::insert(ret);
 
+    mutex.unlock();
     return ret;
   }
 
