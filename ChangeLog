@@ -4,6 +4,20 @@ unique-factory Change Log
 
 .. current developments
 
+v0.2.2
+====================
+
+**Changed:**
+
+* Changed development setup to use pixi instead of conda directly.
+
+**Fixed:**
+
+* Adapted CI setup on GitHub to changes in setup-miniconda.
+* Fixed locking issues when invoked through cling on macOS.
+
+
+
 v0.2.1
 ====================
 
